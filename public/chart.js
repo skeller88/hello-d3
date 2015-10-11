@@ -1,6 +1,4 @@
-alert('foo')
-//d3.select($window).on('resize', drawChart);
-//
+d3.select('body').append('p').text('New!');
 //function drawChart() {
 //    if (d3.select('svg.sk-career-chart')) d3.select('svg.sk-career-chart').remove();
 //

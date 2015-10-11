@@ -1,25 +1,14 @@
+var express = require('express');
 var http = require('http');
-var static = require('node-static');
+var serveStatic = require('serve-static');
 
 var port = 3000;
-var ip = '127.0.0.1';
-var headers = {
-    "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "access-control-allow-headers": "content-type, accept",
-    "access-control-max-age": 10, // Seconds.
-    "content-type": "application/json"
-};
 
-var fileServer = new static.Server('./public');
+var app = express();
 
-var server = http.createServer(function(req, res) {
-    console.log(req.url);
-    req.addListener('end', function() {
-        fileServer.serve(req, res);
-    }).resume();
+app.set('port', process.env.PORT || port);
+app.use(serveStatic(__dirname + '/public'));
+
+http.createServer(app).listen(app.get('port'), function() {
+    console.info('Server now listening on port ' + app.get('port'));
 });
-
-server.listen(port, ip);
-
-console.log('Server listening on port', port);
