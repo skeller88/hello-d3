@@ -1,3 +1,4 @@
+// 446 x 333
 var data = [
     {
         "top_conditions": [
@@ -247,14 +248,27 @@ var data = [
     }
 ];
 
+var width = 446;
+var height = 333;
+var margin = {
+    top: 10,
+    right: 30,
+    bottom: 30,
+    left: 30
+};
+
+var width = 500;
+var height = 300;
+var margin = {top: 10, right: 30, bottom: 30, left: 30};
+
 /**
- *
+ * Chart difference between two groups in counts of symptoms, conditions, or treatments.
  * @param data {array} the two groups of data
- * @param field {string}
+ * @param field {string} 'sex', 'age'
  * @param baselineName {string} baseline group name
  * @param comparisonName {string} group to compare against baseline
  */
-function chart(data, field, baselineName, comparisonName) {
+function chartCounts(data, field, baselineName, comparisonName) {
     var firstGroupName = data[0].groupBy[field];
     var secondGroupName = data[1].groupBy[field];
 
@@ -265,12 +279,191 @@ function chart(data, field, baselineName, comparisonName) {
         var baselineData = data[1].values;
         var comparisonData = data[0].values;
     } else {
-        console.error('Expected group name and comparison group name do not match the data\'s group names.'); 
+        console.error('Expected baseline group name and comparison group name do not match the data\'s group names.');
     }
 
-    var diffData = data.map(function(d) {
-        return {
+    // Munge to compute diffs
+    var diffDataRecord = {};
 
+    comparisonData.forEach(function(obj) {
+        diffDataRecord[obj._id] = obj.count;
+    });
+
+    baselineData.forEach(function(obj) {
+        var comparisonCount = diffDataRecord[obj._id];
+
+        if (comparisonCount === undefined) {
+            console.error('Found baseline _id with no matching comparison _id:', obj._id);
+        } else {
+            diffDataRecord[obj._id] = comparisonCount - obj.count;
         }
-    })
+    });
+
+    // object --> array of objects
+    var diffData = Object.keys(diffDataRecord).map(function(key) {
+       return {
+           _id: key,
+           diff: diffDataRecord[key]
+       };
+    });
+
+    var xScale = d3.scale.ordinal()
+        .domain(diffData.map(function(d) { return d._id; }))
+        .rangeRoundBands([margin.left, width - margin.left - margin.right], 0.1);
+
+    var yScale = d3.scale.linear()
+        .domain(d3.extent(diffData, function(d) { return d.diff; })).nice()
+        .range([height - margin.bottom, margin.top]);
+
+    var div = d3.select("#chart");
+
+    div.append('g')
+        .append('h2')
+        .text('Comparing ' + field + ': ' + comparisonName + ' against ' + baselineName + ' baseline');
+
+    var svg = div.append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    var updateSelection = svg.selectAll("rect.bar")
+        .data(diffData);
+
+    var enterSelection = updateSelection.enter();
+
+    enterSelection.append("rect")
+        .attr("class", function(d) { return d.diff < 0 ? "bar negative" : "bar positive"; })
+        .attr("x", function(d) { return xScale(d._id); })
+        .attr("y", function(d) { return yScale(Math.max(0, d.diff)); })
+        .attr("width", xScale.rangeBand())
+        .attr("height", function(d) { return Math.abs(yScale(d.diff) - yScale(0)); });
+
+    var xAxis = d3.svg.axis()
+        .scale(xScale)
+        .orient("bottom");
+
+    var yAxis = d3.svg.axis()
+        .scale(yScale)
+        .orient("left");
+
+    svg.append("line")
+        .attr("class", "baseline")
+        .attr("y1", yScale(0))
+        .attr("y2", yScale(0))
+        .attr("x1", margin.left)
+        .attr("x2", width - margin.left - margin.right);
+
+    svg.append("text")
+        .attr("class", "baseline-label")
+        .attr("x", width - margin.left - margin.right + 10)
+        .attr("y", yScale(0))
+        .text(field);
+
+    svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0, " + (height - margin.bottom) + ")")
+        .call(xAxis);
+
+    svg.append("g")
+        .attr("class", "y axis")
+        .attr("transform", "translate(" + margin.left + ", 0)")
+        .call(yAxis);
+
+//    svg.append("line")
+//        .attr("class", "baseline")
+//        .attr("y1", yScale(0))
+//        .attr("y2", yScale(0))
+//        .attr("x1", margin.left)
+//        .attr("x2", width - margin.left - margin.right);
+//
+//    svg.append("text")
+//        .attr("class", "baseline-label")
+//        .attr("x", width - margin.left - margin.right + 10)
+//        .attr("y", yScale(0))
+//        .text("Plan");
+//
+//    svg.append("g")
+//        .attr("class", "x axis")
+//        .attr("transform", "translate(0, " + (height - margin.bottom) + ")")
+//        .call(xAxis);
+//
+//    svg.append("g")
+//        .attr("class", "y axis")
+//        .attr("transform", "translate(" + margin.left + ", 0)")
+//        .call(yAxis);
+
+//    var xScale = d3.scale.ordinal()
+//        .domain(diffData.map(function(d) {
+//            return d._id;
+//        }))
+//        .range([
+//            margin.left,
+//            width - margin.left - margin.right
+//        ])
+////        .rangeRoundBands([
+////            margin.left,
+////            width - margin.left - margin.right
+////        ], 0.1);
+//
+//    var yScale = d3.scale.linear()
+//        .domain(d3.extent(diffData, function(d) {
+//            return d.diff;
+//        }))
+//        .nice()
+//        .range([
+//            height - margin.bottom,
+//            margin.top
+//        ]);
+
+//    var svg = d3.select('#chart')
+//        .append('svg')
+//        .attr('width', width)
+//        .attr('height', height);
+//
+//    svg.selectAll('rect.bar')
+//        .data(diffData)
+//        .enter()
+//        .append('rect')
+//        .attr('class', function(d) {
+//            return d.diff < 0 ? 'bar negative' : 'bar positive';
+//        })
+//        .attr('x', function(d) {
+//            return yScale(Math.max(0, d.diff));
+//        })
+//        .attr('width', xScale.rangeBand())
+//        .attr('height', function(d) {
+//            return Math.abs(yScale(d.diff) - yScale(0));
+//        });
+//
+//    var xAxis = d3.svg.axis()
+//        .scale(xScale)
+//        .orient('bottom');
+//
+//    var yAxis = d3.svg.axis()
+//        .scale(yScale)
+//        .orient('left');
+//
+//    svg.append('line')
+//        .attr('class', 'baseline')
+//        .attr('y1', yScale(0))
+//        .attr('y2', yScale(0))
+//        .attr('x1', margin.left)
+//        .attr('x2', width - margin.left - margin.right);
+//
+//    svg.append('text')
+//        .attr('class', 'baseline-label')
+//        .attr('x', width - margin.left - margin.right + 10)
+//        .attr('y', yScale(0))
+//        .text(field);
+//
+//    svg.append('g')
+//        .attr('class', 'x axis')
+//        .attr('transform', 'translate(0, ' + (height - margin.bottom) + ')')
+//        .call(xAxis);
+//
+//    svg.append('g')
+//        .attr('class', 'y axis')
+//        .attr('transform', 'translate(' + margin.left + ', 0)')
+//        .call(yAxis);
 }
+
+chartCounts(data[1].n_conditions, 'sex', 'male', 'female');

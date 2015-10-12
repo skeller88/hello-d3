@@ -1,5 +1,25 @@
-.bar {
-    display: inline-block;
-    width: 20px;
-    background-color: teal;
+h2, text {
+    font-family: "Helvetica", sans-serif;
+}
+
+.bar.negative {
+    fill: rgb(240, 126, 110);
+}
+
+.bar.positive {
+    fill: rgb(140, 140, 140);
+}
+
+.axis path {
+    stroke: none;
+    fill: none;
+}
+
+.baseline {
+    stroke: black;
+}
+
+.baseline-label {
+    text-anchor: start;
+    alignment-baseline: middle;
 }
