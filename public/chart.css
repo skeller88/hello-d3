@@ -1,5 +1,14 @@
-h2, text {
+h4, text {
     font-family: "Helvetica", sans-serif;
+}
+
+.axis path, .axis line {
+    fill: none;
+    stroke: #000;
+}
+
+.bar rect {
+    fill: darkgrey;
 }
 
 .bar.negative {

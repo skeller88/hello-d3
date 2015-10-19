@@ -264,9 +264,8 @@ var margin = {
  * @param field {string} 'sex', 'age'
  * @param baselineName {string} baseline group name
  * @param comparisonName {string} group to compare against baseline
- * @param binSize {int} size of histogram bin
  */
-function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
+function chartCounts(dataObj, field, baselineName, comparisonName) {
     var chartTypes = {
         'n_conditions': 'conditions',
         'n_symptoms': 'symptoms',
@@ -276,6 +275,7 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
 
     function getChartType(dataObj) {
         var chartTypeKeys = Object.keys(chartTypes);
+        console.log(chartTypeKeys);
 
         for (var i = 0; i < chartTypeKeys.length; i++) {
             if (dataObj[chartTypeKeys[i]] != undefined) {
@@ -292,9 +292,6 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
     var firstGroupName = data[0].groupBy[field];
     var secondGroupName = data[1].groupBy[field];
 
-    // Chart options
-    var binMargin = .2;
-    var binSize = binSize || 2;
     var title = 'Number of ' + chartTypeName + ': comparing ' + comparisonName + ' against ' + baselineName + ' baseline';
     var xLabel = 'Number of ' + chartTypeName;
     var yLabel = 'Count';
@@ -310,80 +307,37 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
     }
 
     // Munge to compute diffs
-    // {1 : 300, 2: 30, 4: 50}
     var diffDataRecord = {};
+
     comparisonData.forEach(function(obj) {
         diffDataRecord[obj._id] = obj.count;
     });
 
-    // {1: -30, 2: 20, 3: -100, 4: 0}
     baselineData.forEach(function(obj) {
         var comparisonCount = diffDataRecord[obj._id];
 
         if (comparisonCount === undefined) {
-            console.warn('Found baseline _id with no matching comparison _id:', obj._id);
-            diffDataRecord[obj._id] = 0 - obj.count;
+            console.error('Found baseline _id with no matching comparison _id:', obj._id);
         } else {
             diffDataRecord[obj._id] = comparisonCount - obj.count;
         }
     });
 
-    var extent = d3.extent(baselineData.concat(comparisonData), function(d) {
-        // value of "_id" is the "number of conditions/symptoms/treatments". The value type is String.
-        return parseInt(d._id);
+    // object --> array of objects
+    var diffData = Object.keys(diffDataRecord).map(function(key) {
+       return {
+           _id: key,
+           diff: diffDataRecord[key]
+       };
     });
-    var min = extent[0];
-    // histograms in R hist() are left-open and right-closed by default.
-    var max = extent[1];
-    var numBins = ((max + 1 - min) / binSize);
 
-    // object --> array of binned objects
-    // {1: -30, 2: 20, 3: -100, 4: 0} --> [{bin: 0, diff: -30}, {bin: 2, diff: -80}, {bin: 4, diff:0}]
-    var histData = [];
-    var currentBin = min;
-
-    for (var binNum = 0; binNum < numBins; binNum++) {
-        var binDiffCount = 0;
-
-        for (var i = currentBin; i < currentBin + binSize; i++) {
-            if (diffDataRecord[i] != undefined) {
-                var aaa = diffDataRecord[i];
-                binDiffCount += diffDataRecord[i];
-            }
-        }
-
-        histData.push({bin: currentBin, diff: binDiffCount});
-        currentBin += binSize;
-    }
-
-    var diffExtent = d3.extent(histData, function(d) { return d.diff; });
-    var minDiff = diffExtent[0];
-    var maxDiff = diffExtent[1];
-
-
-    // This scale is for determining the widths of the histogram bars
-    // Must start at 0 or else x (bin size a.k.a dx) will be negative
-
-    var xWidthScale = d3.scale.linear()
-        .domain([0, (max - min)])
-        .range([0, width]);
-
-    // Scale for the placement of the bars
-    var xPositionScale = d3.scale.linear()
-        .domain([min, max])
-        .range([0, width]);
+    var xScale = d3.scale.ordinal()
+        .domain(diffData.map(function(d) { return d._id; }))
+        .rangeRoundBands([margin.left, width - margin.left - margin.right], 0.1);
 
     var yScale = d3.scale.linear()
-        .domain([minDiff, maxDiff])
-        .range([height, 0]);
-
-    var xAxis = d3.svg.axis()
-        .scale(xPositionScale)
-        .orient("bottom");
-
-    var yAxis = d3.svg.axis()
-        .scale(yScale)
-        .orient("left");
+        .domain(d3.extent(diffData, function(d) { return d.diff; })).nice()
+        .range([height - margin.bottom, margin.top]);
 
     var div = d3.select("#chart");
 
@@ -392,30 +346,46 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
         // Example: "Number of conditions: comparing male against female baseline"
         .text(title);
 
-    var svg = d3.select("body").append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    var svg = div.append("svg")
+        .attr("width", width)
+        .attr("height", height);
 
-    var bar = svg.selectAll(".bar")
-        .data(histData)
-        .enter().append("rect")
-        .attr("class", "bar")
-        .attr('x', function(d) {
-            return d.bin * 20 ;
-        })
-        .attr('y', function(d) {
-            return d.diff;
-        })
-        .attr('width', 20)
-        .attr('height', function(d) {
-            return height - yScale(d.diff);
-        });
+    var updateSelection = svg.selectAll("rect.bar")
+        .data(diffData);
+
+    var enterSelection = updateSelection.enter();
+
+    enterSelection.append("rect")
+        .attr("class", function(d) { return d.diff < 0 ? "bar negative" : "bar positive"; })
+        .attr("x", function(d) { return xScale(d._id); })
+        .attr("y", function(d) { return yScale(Math.max(0, d.diff)); })
+        .attr("width", xScale.rangeBand())
+        .attr("height", function(d) { return Math.abs(yScale(d.diff) - yScale(0)); });
+
+    var xAxis = d3.svg.axis()
+        .scale(xScale)
+        .orient("bottom");
+
+    var yAxis = d3.svg.axis()
+        .scale(yScale)
+        .orient("left");
+
+    svg.append("line")
+        .attr("class", "baseline")
+        .attr("y1", yScale(0))
+        .attr("y2", yScale(0))
+        .attr("x1", margin.left)
+        .attr("x2", width - margin.left - margin.right);
+
+    svg.append("text")
+        .attr("class", "baseline-label")
+        .attr("x", width - margin.left - margin.right + 10)
+        .attr("y", yScale(0))
+        .text(field);
 
     svg.append("g")
         .attr("class", "x axis")
-        .attr("transform", "translate(0, " + (height) + ")")
+        .attr("transform", "translate(0, " + (height - margin.bottom) + ")")
         .call(xAxis)
         .append('text')
         .attr('class', 'x-label label')
