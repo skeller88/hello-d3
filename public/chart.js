@@ -255,55 +255,81 @@ var height = 333;
 var outerMargin = {
     top: 10,
     right: 30,
-    bottom: 30,
+    bottom: 35,
     left: 40
 };
 var axisLabelMargin = {
-    x: 7,
+    x: 10,
     y: 3
 }
+var chartTitleMargin = 5;
 var innerWidth = width - outerMargin.left - outerMargin.right;
 var innerHeight = height - outerMargin.top - outerMargin.bottom;
 
 /**
  * Chart difference between two groups in counts of symptoms, conditions, or treatments.
- * @param dataObj {object} the two groups of data wrapped in an object
+ * @param rawData {object} the two groups of data wrapped in an object
  * @param field {string} 'sex', 'age'
  * @param baselineName {string} baseline group name
  * @param comparisonName {string} group to compare against baseline
  * @param binSize {int} size of histogram bin
  */
-function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
-    var chartTypes = {
+function chartCounts(rawData, field, baselineName, comparisonName, binSize) {
+    console.log('Comparing', comparisonName, 'against', baselineName, 'baseline');
+
+    var mungedData = mungeData(rawData, field, baselineName, comparisonName);
+    var diffDataRecord = computeGroupDifferences(mungedData.baselineData, mungedData.comparisonData);
+    var binSize = binSize || 2;
+    var chartOptions = {
+        binSize: binSize,
+        chartTypeName: mungedData.chartTypeName
+    };
+    var totalData = mungedData.baselineData.concat(mungedData.comparisonData);
+
+    drawHistogramChart(totalData, diffDataRecord, chartOptions);
+}
+
+function getChartType(dataObj) {
+    var chartTypes = [
+        'n_conditions',
+        'n_symptoms',
+        'n_treatments'
+    ];
+
+    for (var i = 0; i < chartTypes.length; i++) {
+        if (dataObj[chartTypes[i]] != undefined) {
+            return chartTypes[i];
+        }
+    }
+    return null;
+}
+
+function getChartName(chartType) {
+    var chartTypeToNameMap = {
         'n_conditions': 'conditions',
         'n_symptoms': 'symptoms',
         'n_treatments': 'treatments'
     };
 
+    return chartTypeToNameMap[chartType];
+}
 
-    function getChartType(dataObj) {
-        var chartTypeKeys = Object.keys(chartTypes);
-
-        for (var i = 0; i < chartTypeKeys.length; i++) {
-            if (dataObj[chartTypeKeys[i]] != undefined) {
-                return chartTypeKeys[i];
-            }
-        }
-    }
-
+/**
+ *
+ * @param dataObj
+ * @param field
+ * @param baselineName
+ * @param comparisonName
+ * @returns {{baselineData: (*|values|fixture.values|data.values), comparisonData: (*|values|fixture.values|data.values), chartTypeName: *}}
+ */
+function mungeData(dataObj, field, baselineName, comparisonName) {
     // look up the proper key in data
     var chartType = getChartType(dataObj);
     // populate chart title and x axis
-    var chartTypeName = chartTypes[chartType];
+    var chartTypeName = getChartName(chartType);
     var data = dataObj[chartType];
     var firstGroupName = data[0].groupBy[field];
     var secondGroupName = data[1].groupBy[field];
-
-    // Chart options
-    var binSize = binSize || 2;
-    var title = 'Number of ' + chartTypeName + ': comparing ' + comparisonName + ' against ' + baselineName + ' baseline';
-    var xLabel = 'Number of ' + chartTypeName;
-    var yLabel = 'Count difference';
 
     if (firstGroupName === baselineName && secondGroupName === comparisonName) {
         var baselineData = data[0].values;
@@ -315,6 +341,20 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
         console.error('Expected baseline group name and comparison group name do not match the data\'s group names.');
     }
 
+    return {
+        baselineData: baselineData,
+        comparisonData: comparisonData,
+        chartTypeName: chartTypeName
+    }
+}
+
+/**
+ *
+ * @param baselineData
+ * @param comparisonData
+ * @returns {{}} differences between groups at each count level, example: {1: -30, 2: 20, 3: -100, 4: 0}
+ */
+function computeGroupDifferences(baselineData, comparisonData) {
     // Munge to compute diffs
     // {1 : 300, 2: 30, 4: 50}
     var diffDataRecord = {};
@@ -334,7 +374,17 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
         }
     });
 
-    var extent = d3.extent(baselineData.concat(comparisonData), function(d) {
+    return diffDataRecord;
+}
+
+function drawHistogramChart(data, diffDataRecord, chartOptions) {
+    // Chart options
+    var binSize = chartOptions.binSize || 2;
+    var title = 'Number of ' + chartOptions.chartTypeName;
+    var xLabel = 'Number of ' + chartOptions.chartTypeName;
+    var yLabel = 'Count difference';
+
+    var extent = d3.extent(data, function(d) {
         // value of "_id" is the "number of conditions/symptoms/treatments". The value type is String.
         return parseInt(d._id);
     });
@@ -364,7 +414,7 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
     var diffExtent = d3.extent(histData, function(d) { return d.diff; });
     var minDiff = diffExtent[0];
     var maxDiff = diffExtent[1];
-    
+
     console.log(histData);
 
 
@@ -378,7 +428,7 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
 
     var yScale = d3.scale.linear()
         .domain([minDiff, maxDiff])
-        .range([height - outerMargin.bottom, outerMargin.top]);
+        .range([innerHeight, outerMargin.top]);
 
     var xAxis = d3.svg.axis()
         .scale(xPositionScale)
@@ -389,10 +439,12 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
         .orient("left");
 
     var svg = d3.select("body").append("svg")
-        .attr("width", width + outerMargin.left + outerMargin.right)
-        .attr("height", height + outerMargin.top + outerMargin.bottom)
+        .attr("width", width)
+        .attr("height", height)
         .append("g")
-        .attr("transform", "translate(" + outerMargin.left + "," + outerMargin.top + ")");
+        .attr('width', innerWidth)
+        .attr('height', innerHeight)
+        .attr("transform", "translate(" + outerMargin.left + "," + outerMargin.top + ")")
 
     // Change if we decide to not make all bins the same width
     var renderedBinWidth = Math.abs(xPositionScale(binSize) - xPositionScale(0));
@@ -420,7 +472,7 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
         .call(xAxis)
         .append('text')
         .attr('class', 'x-label label')
-        .attr('transform', 'translate(' + (innerWidth/2) + ',' + (outerMargin.bottom + axisLabelMargin.x) + ')')
+        .attr('transform', 'translate(' + (innerWidth/2 - outerMargin.left) + ',' + (outerMargin.bottom + axisLabelMargin.x) + ')')
         .text(xLabel);
 
     svg.append("g")
@@ -429,19 +481,21 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
         .call(yAxis)
         .append('text')
         .attr('class', 'y-label label')
-        .attr('transform', 'translate(' + -(outerMargin.left + axisLabelMargin.y) +',' + height/2 + ') rotate(' + (-90) + ')')
+        .attr('transform', 'translate(' + -(outerMargin.left + axisLabelMargin.y) +',' + (height/2 + outerMargin.top) + ') rotate(' + (-90) + ')')
         .text(yLabel);
 
-    svg.append('g')
-        .append('h4')
-        // Example: "Number of conditions: comparing male against female baseline"
+    // Chart title.
+    // Example: "Number of conditions"
+    svg.append('text')
+        .attr("text-anchor", "middle")
+        .attr('transform', 'translate(' + (innerWidth/2) + ', ' + chartTitleMargin + ')')
         .text(title);
 }
 
-chartCounts(data[1], 'sex', 'male', 'female');
-chartCounts(data[3], 'sex', 'male', 'female');
-chartCounts(data[5], 'sex', 'male', 'female');
+//chartCounts(data[1], 'sex', 'male', 'female');
+//chartCounts(data[3], 'sex', 'male', 'female');
+//chartCounts(data[5], 'sex', 'male', 'female');
 
-//chartCounts(data[1], 'sex', 'female', 'male');
-//chartCounts(data[3], 'sex', 'female', 'male');
-//chartCounts(data[5], 'sex', 'female', 'male');
+chartCounts(data[1], 'sex', 'female', 'male');
+chartCounts(data[3], 'sex', 'female', 'male');
+chartCounts(data[5], 'sex', 'female', 'male');
