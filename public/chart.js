@@ -248,15 +248,22 @@ var data = [
     }
 ];
 
+
+// Chart settings
 var width = 446;
 var height = 333;
-var margin = {
+var outerMargin = {
     top: 10,
     right: 30,
     bottom: 30,
-    left: 30
+    left: 40
 };
-
+var axisLabelMargin = {
+    x: 7,
+    y: 3
+}
+var innerWidth = width - outerMargin.left - outerMargin.right;
+var innerHeight = height - outerMargin.top - outerMargin.bottom;
 
 /**
  * Chart difference between two groups in counts of symptoms, conditions, or treatments.
@@ -293,11 +300,10 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
     var secondGroupName = data[1].groupBy[field];
 
     // Chart options
-    var binMargin = .2;
     var binSize = binSize || 2;
     var title = 'Number of ' + chartTypeName + ': comparing ' + comparisonName + ' against ' + baselineName + ' baseline';
     var xLabel = 'Number of ' + chartTypeName;
-    var yLabel = 'Count';
+    var yLabel = 'Count difference';
 
     if (firstGroupName === baselineName && secondGroupName === comparisonName) {
         var baselineData = data[0].values;
@@ -347,7 +353,6 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
 
         for (var i = currentBin; i < currentBin + binSize; i++) {
             if (diffDataRecord[i] != undefined) {
-                var aaa = diffDataRecord[i];
                 binDiffCount += diffDataRecord[i];
             }
         }
@@ -359,23 +364,21 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
     var diffExtent = d3.extent(histData, function(d) { return d.diff; });
     var minDiff = diffExtent[0];
     var maxDiff = diffExtent[1];
+    
+    console.log(histData);
 
 
     // This scale is for determining the widths of the histogram bars
     // Must start at 0 or else x (bin size a.k.a dx) will be negative
 
-    var xWidthScale = d3.scale.linear()
-        .domain([0, (max - min)])
-        .range([0, width]);
-
     // Scale for the placement of the bars
     var xPositionScale = d3.scale.linear()
         .domain([min, max])
-        .range([0, width]);
+        .range([outerMargin.left, innerWidth]);
 
     var yScale = d3.scale.linear()
         .domain([minDiff, maxDiff])
-        .range([height, 0]);
+        .range([height - outerMargin.bottom, outerMargin.top]);
 
     var xAxis = d3.svg.axis()
         .scale(xPositionScale)
@@ -385,52 +388,60 @@ function chartCounts(dataObj, field, baselineName, comparisonName, binSize) {
         .scale(yScale)
         .orient("left");
 
-    var div = d3.select("#chart");
-
-    div.append('g')
-        .append('h4')
-        // Example: "Number of conditions: comparing male against female baseline"
-        .text(title);
-
     var svg = d3.select("body").append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
+        .attr("width", width + outerMargin.left + outerMargin.right)
+        .attr("height", height + outerMargin.top + outerMargin.bottom)
         .append("g")
-        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        .attr("transform", "translate(" + outerMargin.left + "," + outerMargin.top + ")");
 
+    // Change if we decide to not make all bins the same width
+    var renderedBinWidth = Math.abs(xPositionScale(binSize) - xPositionScale(0));
     var bar = svg.selectAll(".bar")
         .data(histData)
         .enter().append("rect")
-        .attr("class", "bar")
+        .attr("class", function(d) { return d.diff < 0 ? "bar negative" : "bar positive"; })
         .attr('x', function(d) {
-            return d.bin * 20 ;
+            return xPositionScale(d.bin);
         })
-        .attr('y', function(d) {
-            return d.diff;
-        })
-        .attr('width', 20)
-        .attr('height', function(d) {
-            return height - yScale(d.diff);
-        });
+        .attr("y", function(d) { return yScale(Math.max(0, d.diff)); })
+        .attr('width', renderedBinWidth)
+        .attr("height", function(d) { return Math.abs(yScale(d.diff) - yScale(0)); });
+
+    svg.append("line")
+        .attr("class", "baseline")
+        .attr("y1", yScale(0))
+        .attr("y2", yScale(0))
+        .attr("x1", outerMargin.left)
+        .attr("x2", innerWidth);
 
     svg.append("g")
         .attr("class", "x axis")
-        .attr("transform", "translate(0, " + (height) + ")")
+        .attr("transform", "translate(0, " + (height - outerMargin.bottom) + ")")
         .call(xAxis)
         .append('text')
         .attr('class', 'x-label label')
-        .attr('transform', 'translate(' + (width / 2) + ',' + (40) + ')')
-//        .text(xLabel);
+        .attr('transform', 'translate(' + (innerWidth/2) + ',' + (outerMargin.bottom + axisLabelMargin.x) + ')')
+        .text(xLabel);
 
     svg.append("g")
         .attr("class", "y axis")
-        .attr("transform", "translate(" + margin.left + ", 0)")
+        .attr("transform", "translate(" + (outerMargin.left) + ", 0)")
         .call(yAxis)
         .append('text')
         .attr('class', 'y-label label')
-        .attr('transform', 'translate(0,' + (10) + ')');
+        .attr('transform', 'translate(' + -(outerMargin.left + axisLabelMargin.y) +',' + height/2 + ') rotate(' + (-90) + ')')
+        .text(yLabel);
+
+    svg.append('g')
+        .append('h4')
+        // Example: "Number of conditions: comparing male against female baseline"
+        .text(title);
 }
 
 chartCounts(data[1], 'sex', 'male', 'female');
 chartCounts(data[3], 'sex', 'male', 'female');
 chartCounts(data[5], 'sex', 'male', 'female');
+
+//chartCounts(data[1], 'sex', 'female', 'male');
+//chartCounts(data[3], 'sex', 'female', 'male');
+//chartCounts(data[5], 'sex', 'female', 'male');
