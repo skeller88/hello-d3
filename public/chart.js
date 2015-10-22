@@ -797,9 +797,9 @@ function chartBetweenGroupCounts(rawData, field, baselineName, comparisonName, b
 
     // keys of diffDataRecord, "_id"s, are the "number of conditions/symptoms/treatments". The value type is String.
     var extent = d3.extent(Object.keys(diffDataRecord));
-    var min = extent[0];
-    // histograms in R hist() are left-open and right-closed by default.
-    var max = extent[1];
+    var min = parseInt(extent[0]);
+//    // histograms in R hist() are left-open and right-closed by default.
+    var max = parseInt(extent[1]);
 
     drawHistogramChart(diffDataRecord, max, min, chartOptions);
 }
@@ -944,7 +944,7 @@ function drawHistogramChart(data, max, min, chartOptions) {
     var xLabel = 'Number of ' + chartOptions.chartTypeName;
     var yLabel = 'Count difference';
 
-    var numBins = Math.ceil((max + 1 - min) / binSize);
+    var numBins = (max + 1 - min) / binSize;
 
     // object --> array of binned objects
     // {1: -30, 2: 20, 3: -100, 4: 0} --> [{bin: 0, diff: -30}, {bin: 2, diff: -80}, {bin: 4, diff:0}]
@@ -1045,12 +1045,12 @@ function drawHistogramChart(data, max, min, chartOptions) {
         .text(title);
 }
 
-chartSingleGroupCounts(singleGroupData, 'n_conditions');
-chartSingleGroupCounts(singleGroupData, 'n_symptoms');
-chartSingleGroupCounts(singleGroupData, 'n_treatments');
-//chartBetweenGroupCounts(segmentedData[1], 'sex', 'male', 'female');
-//chartBetweenGroupCounts(segmentedData[3], 'sex', 'male', 'female');
-//chartBetweenGroupCounts(segmentedData[5], 'sex', 'male', 'female');
+//chartSingleGroupCounts(singleGroupData, 'n_conditions');
+//chartSingleGroupCounts(singleGroupData, 'n_symptoms');
+//chartSingleGroupCounts(singleGroupData, 'n_treatments');
+chartBetweenGroupCounts(segmentedData[1], 'sex', 'male', 'female');
+chartBetweenGroupCounts(segmentedData[3], 'sex', 'male', 'female');
+chartBetweenGroupCounts(segmentedData[5], 'sex', 'male', 'female');
 
 //chartBetweenGroupCounts(data[1], 'sex', 'female', 'male');
 //chartBetweenGroupCounts(data[3], 'sex', 'female', 'male');
