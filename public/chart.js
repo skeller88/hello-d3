@@ -768,10 +768,12 @@ function chartSingleGroupCounts(rawData, category, binSize) {
     var keys = Object.keys(data);
 
     // keys of data, "_id"s, are the "number of conditions/symptoms/treatments". The value type is String.
-    var extent = d3.extent(keys);
-    var min = parseInt(extent[0]);
-//    // histograms in R hist() are left-open and right-closed by default.
-    var max = parseInt(extent[1]);
+    var extent = d3.extent(Object.keys(data), function(d) {
+        return parseInt(d);
+    });
+    var min = extent[0];
+    // histograms in R hist() are left-open and right-closed by default.
+    var max = extent[1];
 
     drawHistogramChart(data, max, min, chartOptions);
 }
@@ -795,11 +797,15 @@ function chartBetweenGroupCounts(rawData, field, baselineName, comparisonName, b
         chartTypeName: mungedData.chartTypeName
     };
 
+    var totalData = mungedData.baselineData.concat(mungedData.comparisonData);
+
     // keys of diffDataRecord, "_id"s, are the "number of conditions/symptoms/treatments". The value type is String.
-    var extent = d3.extent(Object.keys(diffDataRecord));
-    var min = parseInt(extent[0]);
-//    // histograms in R hist() are left-open and right-closed by default.
-    var max = parseInt(extent[1]);
+    var extent = d3.extent(Object.keys(totalData), function(d) {
+        return parseInt(d);
+    });
+    var min = extent[0];
+    // histograms in R hist() are left-open and right-closed by default.
+    var max = extent[1];
 
     drawHistogramChart(diffDataRecord, max, min, chartOptions);
 }
@@ -1045,12 +1051,12 @@ function drawHistogramChart(data, max, min, chartOptions) {
         .text(title);
 }
 
-//chartSingleGroupCounts(singleGroupData, 'n_conditions');
-//chartSingleGroupCounts(singleGroupData, 'n_symptoms');
-//chartSingleGroupCounts(singleGroupData, 'n_treatments');
-chartBetweenGroupCounts(segmentedData[1], 'sex', 'male', 'female');
-chartBetweenGroupCounts(segmentedData[3], 'sex', 'male', 'female');
-chartBetweenGroupCounts(segmentedData[5], 'sex', 'male', 'female');
+chartSingleGroupCounts(singleGroupData, 'n_conditions');
+chartSingleGroupCounts(singleGroupData, 'n_symptoms');
+chartSingleGroupCounts(singleGroupData, 'n_treatments');
+//chartBetweenGroupCounts(segmentedData[1], 'sex', 'male', 'female');
+//chartBetweenGroupCounts(segmentedData[3], 'sex', 'male', 'female');
+//chartBetweenGroupCounts(segmentedData[5], 'sex', 'male', 'female');
 
 //chartBetweenGroupCounts(data[1], 'sex', 'female', 'male');
 //chartBetweenGroupCounts(data[3], 'sex', 'female', 'male');
