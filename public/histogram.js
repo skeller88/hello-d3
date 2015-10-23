@@ -559,7 +559,7 @@ var segmentedData = [
                     {"_id": 14, "count": 1},
                     {"_id": 18, "count": 1},
                     {"_id": 21, "count": 1},
-                    {"_id": 25, "count": 1}
+                    {"_id": 25, "count": 100}
                 ]
             }
         ]
@@ -744,7 +744,7 @@ var outerMargin = {
 var axisLabelMargin = {
     x: 10,
     y: 3
-}
+};
 var chartTitleMargin = 5;
 var innerWidth = width - outerMargin.left - outerMargin.right;
 var innerHeight = height - outerMargin.top - outerMargin.bottom;
@@ -800,44 +800,14 @@ function chartBetweenGroupCounts(rawData, field, baselineName, comparisonName, b
     var totalData = mungedData.baselineData.concat(mungedData.comparisonData);
 
     // keys of diffDataRecord, "_id"s, are the "number of conditions/symptoms/treatments". The value type is String.
-    var extent = d3.extent(Object.keys(totalData), function(d) {
-        return parseInt(d);
+    var extent = d3.extent(totalData, function(d) {
+        return d._id;
     });
     var min = extent[0];
     // histograms in R hist() are left-open and right-closed by default.
     var max = extent[1];
 
     drawHistogramChart(diffDataRecord, max, min, chartOptions);
-}
-
-/**
- *
- * @param dataObj - {'top_conditions':[], 'n_conditions':[], ...}
- * @returns string
- */
-function getChartType(dataObj) {
-    var chartTypes = [
-        'n_conditions',
-        'n_symptoms',
-        'n_treatments'
-    ];
-
-    for (var i = 0; i < chartTypes.length; i++) {
-        if (dataObj[chartTypes[i]] != undefined) {
-            return chartTypes[i];
-        }
-    }
-    return null;
-}
-
-function getChartName(chartType) {
-    var chartTypeToNameMap = {
-        'n_conditions': 'conditions',
-        'n_symptoms': 'symptoms',
-        'n_treatments': 'treatments'
-    };
-
-    return chartTypeToNameMap[chartType];
 }
 
 /**
@@ -1023,7 +993,7 @@ function drawHistogramChart(data, max, min, chartOptions) {
         .attr("y1", yScale(0))
         .attr("y2", yScale(0))
         .attr("x1", outerMargin.left)
-        .attr("x2", innerWidth);
+        .attr("x2", width - outerMargin.right);
 
     svg.append("g")
         .attr("class", "x axis")
@@ -1051,12 +1021,59 @@ function drawHistogramChart(data, max, min, chartOptions) {
         .text(title);
 }
 
-chartSingleGroupCounts(singleGroupData, 'n_conditions');
-chartSingleGroupCounts(singleGroupData, 'n_symptoms');
-chartSingleGroupCounts(singleGroupData, 'n_treatments');
-//chartBetweenGroupCounts(segmentedData[1], 'sex', 'male', 'female');
-//chartBetweenGroupCounts(segmentedData[3], 'sex', 'male', 'female');
-//chartBetweenGroupCounts(segmentedData[5], 'sex', 'male', 'female');
+
+/**
+ *
+ * @param rawData [{'n_conditions': {}}, {'n_treatments: {}}]
+ * @param category {string} 'n_conditions'
+ * @returns {*}
+ */
+function getCategoryData(rawData, category) {
+    for (var i = 0; i < rawData.length; i++) {
+        var keys = Object.keys(rawData[i]);
+        if (keys.length && keys[0] === category) {
+            return rawData[i];
+        }
+    }
+    return null;
+}
+
+/**
+ *
+ * @param dataObj - {'top_conditions':[], 'n_conditions':[], ...}
+ * @returns string
+ */
+function getChartType(dataObj) {
+    var chartTypes = [
+        'n_conditions',
+        'n_symptoms',
+        'n_treatments'
+    ];
+
+    for (var i = 0; i < chartTypes.length; i++) {
+        if (dataObj[chartTypes[i]] != undefined) {
+            return chartTypes[i];
+        }
+    }
+    return null;
+}
+
+function getChartName(chartType) {
+    var chartTypeToNameMap = {
+        'n_conditions': 'conditions',
+        'n_symptoms': 'symptoms',
+        'n_treatments': 'treatments'
+    };
+
+    return chartTypeToNameMap[chartType];
+}
+
+//chartSingleGroupCounts(singleGroupData, 'n_conditions', 1);
+//chartSingleGroupCounts(singleGroupData, 'n_symptoms', 1);
+//chartSingleGroupCounts(singleGroupData, 'n_treatments', 1);
+chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_conditions'), 'sex', 'male', 'female', 5);
+chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_symptoms'), 'sex', 'male', 'female', 5);
+chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_treatments'), 'sex', 'male', 'female', 5);
 
 //chartBetweenGroupCounts(data[1], 'sex', 'female', 'male');
 //chartBetweenGroupCounts(data[3], 'sex', 'female', 'male');
