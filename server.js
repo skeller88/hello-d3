@@ -2,7 +2,7 @@ var express = require('express');
 var http = require('http');
 var serveStatic = require('serve-static');
 
-var port = 3000;
+var port = 4000;
 
 var app = express();
 

@@ -733,8 +733,8 @@ var segmentedData = [
 
 
 // Chart settings
-var width = 446;
-var height = 333;
+var width = 372;
+var height = 250;
 var outerMargin = {
     top: 10,
     right: 30,
@@ -811,73 +811,6 @@ function chartBetweenGroupCounts(rawData, field, baselineName, comparisonName, b
 }
 
 /**
- * @param dataObj {object}
- *  {'top_conditions: [
- *      {"groupBy": {"sex": "female"},
- *      "values": [{"_id": 0,  "count": 94}, ...]
- *  }], ...}
- *  @param category {string}
- *  @returns {object} {data: {1: 30, 2: 40}}
- */
-function mungeData(dataObj, category) {
-    if (!dataObj[category]) {
-        console.error('No data for category', category);
-        return;
-    }
-
-    var chartTypeName = getChartName(category);
-
-    var dataRecord = {};
-
-    dataObj[category].forEach(function(el) {
-        dataRecord[el._id] = el.count;
-    });
-
-    return {
-        data: dataRecord,
-        chartTypeName: chartTypeName
-    };
-}
-
-/**
- *
- * @param dataObj -
- *  {'top_conditions: [
- *      {"groupBy": {"sex": "female"},
- *      "values": [{"_id": 0,  "count": 94}, ...]
- *  }], ...}
- * @param field
- * @param baselineName
- * @param comparisonName
- * @returns {{baselineData: (*|values|fixture.values|data.values), comparisonData: (*|values|fixture.values|data.values), chartTypeName: *}}
- */
-function mungeSegmentedData(dataObj, field, baselineName, comparisonName) {
-    // look up the proper key in data
-    var chartType = getChartType(dataObj);
-    // populate chart title and x axis
-    var chartTypeName = getChartName(chartType);
-    var data = dataObj[chartType];
-    var firstGroupName = data[0].groupBy[field];
-    var secondGroupName = data[1].groupBy[field];
-
-    if (firstGroupName === baselineName && secondGroupName === comparisonName) {
-        var baselineData = data[0].values;
-        var comparisonData = data[1].values;
-    } else if (firstGroupName === comparisonName && secondGroupName === baselineName) {
-        var baselineData = data[1].values;
-        var comparisonData = data[0].values;
-    } else {
-        console.error('Expected baseline group name and comparison group name do not match the data\'s group names.');
-    }
-
-    return {
-        baselineData: baselineData,
-        comparisonData: comparisonData,
-        chartTypeName: chartTypeName
-    }
-}
-
-/**
  *
  * @param baselineData
  * @param comparisonData
@@ -950,6 +883,8 @@ function drawHistogramChart(data, max, min, chartOptions) {
     // This scale is for determining the widths of the histogram bars
     // Must start at 0 or else x (bin size a.k.a dx) will be negative
 
+    var binMargin = .2;
+
     // Scale for the placement of the bars
     var xPositionScale = d3.scale.linear()
         .domain([min, max])
@@ -976,14 +911,13 @@ function drawHistogramChart(data, max, min, chartOptions) {
         .attr("transform", "translate(" + outerMargin.left + "," + outerMargin.top + ")")
 
     // Change if we decide to not make all bins the same width
-    var renderedBinWidth = Math.abs(xPositionScale(binSize) - xPositionScale(0));
+    var renderedBinWidth = Math.abs(xPositionScale(binSize - 2 * binMargin) - xPositionScale(0));
+
     var bar = svg.selectAll(".bar")
         .data(histData)
         .enter().append("rect")
         .attr("class", function(d) { return d.diff < 0 ? "bar negative" : "bar positive"; })
-        .attr('x', function(d) {
-            return xPositionScale(d.bin);
-        })
+        .attr('x', function(d) { return xPositionScale(d.bin + binMargin); })
         .attr("y", function(d) { return yScale(Math.max(0, d.diff)); })
         .attr('width', renderedBinWidth)
         .attr("height", function(d) { return Math.abs(yScale(d.diff) - yScale(0)); });
@@ -1068,12 +1002,79 @@ function getChartName(chartType) {
     return chartTypeToNameMap[chartType];
 }
 
+/**
+ * @param dataObj {object}
+ *  {'top_conditions: [
+ *      {"groupBy": {"sex": "female"},
+ *      "values": [{"_id": 0,  "count": 94}, ...]
+ *  }], ...}
+ *  @param category {string}
+ *  @returns {object} {data: {1: 30, 2: 40}}
+ */
+function mungeData(dataObj, category) {
+    if (!dataObj[category]) {
+        console.error('No data for category', category);
+        return;
+    }
+
+    var chartTypeName = getChartName(category);
+
+    var dataRecord = {};
+
+    dataObj[category].forEach(function(el) {
+        dataRecord[el._id] = el.count;
+    });
+
+    return {
+        data: dataRecord,
+        chartTypeName: chartTypeName
+    };
+}
+
+/**
+ *
+ * @param dataObj -
+ *  {'top_conditions: [
+ *      {"groupBy": {"sex": "female"},
+ *      "values": [{"_id": 0,  "count": 94}, ...]
+ *  }], ...}
+ * @param field
+ * @param baselineName
+ * @param comparisonName
+ * @returns {{baselineData: (*|values|fixture.values|data.values), comparisonData: (*|values|fixture.values|data.values), chartTypeName: *}}
+ */
+function mungeSegmentedData(dataObj, field, baselineName, comparisonName) {
+    // look up the proper key in data
+    var chartType = getChartType(dataObj);
+    // populate chart title and x axis
+    var chartTypeName = getChartName(chartType);
+    var data = dataObj[chartType];
+    var firstGroupName = data[0].groupBy[field];
+    var secondGroupName = data[1].groupBy[field];
+
+    if (firstGroupName === baselineName && secondGroupName === comparisonName) {
+        var baselineData = data[0].values;
+        var comparisonData = data[1].values;
+    } else if (firstGroupName === comparisonName && secondGroupName === baselineName) {
+        var baselineData = data[1].values;
+        var comparisonData = data[0].values;
+    } else {
+        console.error('Expected baseline group name and comparison group name do not match the data\'s group names.');
+    }
+
+    return {
+        baselineData: baselineData,
+        comparisonData: comparisonData,
+        chartTypeName: chartTypeName
+    }
+}
+
 //chartSingleGroupCounts(singleGroupData, 'n_conditions', 1);
 //chartSingleGroupCounts(singleGroupData, 'n_symptoms', 1);
 //chartSingleGroupCounts(singleGroupData, 'n_treatments', 1);
-chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_conditions'), 'sex', 'male', 'female', 5);
-chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_symptoms'), 'sex', 'male', 'female', 5);
-chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_treatments'), 'sex', 'male', 'female', 5);
+chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_conditions'), 'sex', 'male', 'female', 2);
+chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_symptoms'), 'sex', 'male', 'female', 2);
+chartBetweenGroupCounts(getCategoryData(segmentedData, 'n_treatments'), 'sex', 'male', 'female', 2);
 
 //chartBetweenGroupCounts(data[1], 'sex', 'female', 'male');
 //chartBetweenGroupCounts(data[3], 'sex', 'female', 'male');
